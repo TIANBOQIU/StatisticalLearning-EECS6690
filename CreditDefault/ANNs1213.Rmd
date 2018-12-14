@@ -15,7 +15,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 data = read.csv("CreditDataRaw.csv",encoding="UTF-8")
-High = ifelse(data$default.payment.next.month==0,"NOT","DEFAULT")
+names(data)[1] <- "ID"
+names(data)[25] <- "Payment" #default.payment.next.month
+High = ifelse(data$Payment==0,"NOT","DEFAULT")
 data = data.frame(data,High)
 set.seed(10)
 DATASIZE = dim(data)[1]
@@ -29,7 +31,6 @@ valid = subset(data,data$indicator==0)
 
 ## Artificial Neural Networks
 ```{r}
-library(nnet)
 # Scale the Feature into the [0,1] interval
 scale01 <- function(x){
   (x - min(x)) / (max(x) - min(x))
@@ -37,33 +38,61 @@ scale01 <- function(x){
 train_norm = train
 valid_norm = valid
 for(name in names(train)){
-  if(name != "X.U.FEFF.ID" && name !="default.payment.next.month" && name != "High"  && name != "indicator"){
+  if(name != "ID" && name !="Payment" && name != "High"  && name != "indicator"){
     train_norm[name] <- scale01(train_norm[name])
     valid_norm[name] <- scale01(valid_norm[name])
   }
   
 }
-names(train_norm)[1] <- "ID"
-names(train_norm)[25] <- "status"
-names(valid_norm)[1] <- "ID"
-names(valid_norm)[25] <- "status"
-train_norm$High = class.ind(train_norm$High)
-valid_norm$High = class.ind(valid_norm$High)
-#train_norm = data.frame(train_norm,nnetLabel)
-#valid_norm = data.frame(valid_norm,nnetLabelValid)
+
+
 ```
 
 ```{r}
 library(neuralnet)
-library(nnet)
-
-n <- names(train_norm)
-f <- as.formula(paste("High ~", paste(n[!n %in% c("ID", "status", "High", "indicator")], collapse = " + ")))
-set.seed(123)
-net = nnet(f, train_norm, size = 10,decay = 5e-4, range = 0.7,  softmax=TRUE, abstol = 0.1)
+# set up ANN formula
+names = names(train)
+f <- as.formula(paste("Payment ~", paste(names[!names %in% c("Payment","ID", "indicator","High")], collapse = " + ")))
 
 ```
 
+```{r}
+net <- neuralnet(f, data=train_norm, hidden = c(3,2),act.fct = "logistic",linear.output = FALSE,lifesign = "full",threshold = 0.05)
+
+#net <- neuralnet(f, data=train_norm, hidden = 20,act.fct = "logistic",linear.output = FALSE,lifesign = "full",threshold = 0.05)
+
+```
+
+
+```{r}
+xx = train_norm
+xx["ID"] <- NULL
+xx["Payment"] <- NULL
+xx["High"] <- NULL
+xx["indicator"] <- NULL
+ret = compute(net, xx)
+result = data.frame(actual = train_norm$Payment, prediction = ret$net.result)
+rounded_result = sapply(result,round,digits=0)
+rounded_result = data.frame(rounded_result)
+tt = table(rounded_result)
+error_train = 1 - sum(diag(tt)) / sum(tt)
+error_train
+
+```
+```{r}
+xxv = valid_norm
+xxv["ID"] <- NULL
+xxv["Payment"] <- NULL
+xxv["High"] <- NULL
+xxv["indicator"] <- NULL
+retv = compute(net, xxv)
+resultv = data.frame(actual = valid_norm$Payment, prediction = retv$net.result)
+rounded_resultv = sapply(resultv,round,digits=0)
+rounded_resultv = data.frame(rounded_resultv)
+ttv = table(rounded_resultv)
+error_valid = 1 - sum(diag(ttv)) / sum(ttv)
+error_valid
+```
 
 ```{r}
 # training error
