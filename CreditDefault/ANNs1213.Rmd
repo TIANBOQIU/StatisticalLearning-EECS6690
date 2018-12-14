@@ -1,0 +1,82 @@
+---
+title: "ClassificationTree"
+author: "Tianbo Qiu"
+date: "December 12, 2018"
+output: pdf_document
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+data = read.csv("CreditDataRaw.csv",encoding="UTF-8")
+High = ifelse(data$default.payment.next.month==0,"NOT","DEFAULT")
+data = data.frame(data,High)
+set.seed(10)
+DATASIZE = dim(data)[1]
+train_index = sample(DATASIZE, DATASIZE*0.8)
+indicator = rep(0,DATASIZE)
+indicator[train_index] = 1 # 1:train 0:valid
+data = data.frame(data,indicator)
+train = subset(data,data$indicator==1)
+valid = subset(data,data$indicator==0)
+```
+
+## Artificial Neural Networks
+```{r}
+library(nnet)
+# Scale the Feature into the [0,1] interval
+scale01 <- function(x){
+  (x - min(x)) / (max(x) - min(x))
+}
+train_norm = train
+valid_norm = valid
+for(name in names(train)){
+  if(name != "X.U.FEFF.ID" && name !="default.payment.next.month" && name != "High"  && name != "indicator"){
+    train_norm[name] <- scale01(train_norm[name])
+    valid_norm[name] <- scale01(valid_norm[name])
+  }
+  
+}
+names(train_norm)[1] <- "ID"
+names(train_norm)[25] <- "status"
+names(valid_norm)[1] <- "ID"
+names(valid_norm)[25] <- "status"
+train_norm$High = class.ind(train_norm$High)
+valid_norm$High = class.ind(valid_norm$High)
+#train_norm = data.frame(train_norm,nnetLabel)
+#valid_norm = data.frame(valid_norm,nnetLabelValid)
+```
+
+```{r}
+library(neuralnet)
+library(nnet)
+
+n <- names(train_norm)
+f <- as.formula(paste("High ~", paste(n[!n %in% c("ID", "status", "High", "indicator")], collapse = " + ")))
+set.seed(123)
+net = nnet(f, train_norm, size = 10,decay = 5e-4, range = 0.7,  softmax=TRUE, abstol = 0.1)
+
+```
+
+
+```{r}
+# training error
+predL = predict(net,train_norm,type="class")
+tt = table(train$High, predL)
+error_train = 1 - sum(diag(tt)) / sum(tt)
+error_train
+
+# validation error
+predLV = predict(net,valid_norm,type="class")
+tv = table(valid$High,predLV)
+error_valid = 1 - sum(diag(tv)) /  sum(tv)
+error_valid
+```
+
+
