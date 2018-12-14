@@ -2,8 +2,8 @@
 
 Classification accuracy
 |Method  	              |Error rate  	|  	          |Area ratio   |  	          |
-|  	                    |Training  	  |Validation  	|training  	  |Validation  	|
 |:--------------------- |:----------:	|:----------:	|:----------:	|:----------:	|
+|  	                    |Training  	  |Validation  	|training  	  |Validation  	|
 |K-nearest neighbor  	  |  	          |  	          |           	|           	|
 |Logistic regression    |           	|           	|           	|           	|
 |Discriminant analysis	|            	|            	|            	|            	|
