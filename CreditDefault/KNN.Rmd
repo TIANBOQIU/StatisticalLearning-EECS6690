@@ -1,0 +1,240 @@
+---
+title: "KNN1215"
+author: "Tianbo Qiu"
+date: "December 15, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+K-NN
+read the data
+```{r}
+data = read.csv("CreditDataRaw.csv",encoding="UTF-8")
+names(data)[1] <- "ID"
+names(data)[25] <- "Payment" #default.payment.next.month
+High = ifelse(data$Payment==0,"NOT","DEFAULT")
+data = data.frame(data,High)
+
+cl <- factor(data$High)
+data = data.frame(data,cl)
+
+
+set.seed(10)
+DATASIZE = dim(data)[1]
+train_index = sample(DATASIZE, DATASIZE*0.8)
+indicator = rep(0,DATASIZE)
+indicator[train_index] = 1 # 1:train 0:valid
+data = data.frame(data,indicator)
+train = subset(data,data$indicator==1)
+valid = subset(data,data$indicator==0)
+```
+
+```{r}
+names = names(train)
+f <- as.formula(paste("Payment ~", paste(names[!names %in% c("Payment","ID", "indicator","High","cl")], collapse = " + ")))
+```
+
+
+
+
+
+
+# norm the data
+```{r}
+# Scale the Feature into the [0,1] interval
+scale01 <- function(x){
+  (x - min(x)) / (max(x) - min(x))
+}
+train_norm = train
+valid_norm = valid
+for(name in names(train)){
+  if(name != "cl" && name != "ID" && name !="Payment" && name != "High"  && name != "indicator"){
+    train_norm[name] <- scale01(train_norm[name])
+    valid_norm[name] <- scale01(valid_norm[name])
+  }
+  
+}
+
+```
+
+K-NN
+```{r}
+#train_knn = train
+#valid_knn = valid
+train_knn = train_norm
+valid_knn = valid_norm
+
+train_knn$ID <- NULL
+train_knn$Payment <- NULL
+train_knn$High <- NULL
+train_knn$cl <- NULL
+train_knn$indicator <- NULL
+
+valid_knn$ID <- NULL
+valid_knn$Payment <- NULL
+valid_knn$High <- NULL
+valid_knn$cl <- NULL
+valid_knn$indicator <- NULL
+
+## try to use subset of features
+##pSize = length(names(train_knn))
+##samp = sample(pSize, 23)
+##train_knn = train_knn[, samp]
+##valid_knn = valid_knn[, samp]
+
+knnt = knn(train_knn,train_knn,train$cl,k=100,prob = TRUE)
+knnv = knn(train_knn,valid_knn,train$cl,k=100,prob = TRUE)
+
+tt = table(pred = knnt, actual = train$High)
+error_train = 1 - sum(diag(tt)) / sum(tt)
+
+tv = table(pred = knnv, actual = valid$High)
+error_valid = 1 - sum(diag(tv)) / sum(tv)
+error_train
+error_valid
+```
+gains
+```{r}
+# training
+PredKNNLabel = data.frame(knnt)
+names(PredKNNLabel) <- "PredKNNLabel"
+PredKNNScore = attr(knnt, "prob") # its the propotion of the wining class
+# convert it into the probablity of default
+for (i in 1:length(PredKNNScore)){
+  if (knnt[i] == "NOT"){
+    PredKNNScore[i] = 1 - PredKNNScore[i]
+  }
+}
+PredKNNScore = data.frame(PredKNNScore)
+names(PredKNNScore) <- "PredKNNScore"
+train_norm = data.frame(train_norm,PredKNNLabel, PredKNNScore)
+```
+
+```{r}
+library(gains)
+library(rlang)
+gtt = gains(actual=train_norm$Payment, predicted=train_norm$PredKNNScore,optimal=TRUE)
+cpt_y = gtt$cume.pct.of.total
+#cpt_y = prepend(cpt_y,0,before=1)
+cpt_x = gtt$depth
+#cpt_x = prepend(cpt_x,0,before=1)
+#fit = lm(cpt_y~poly(cpt_x,3,raw=TRUE))
+predicted = table(train_norm$PredKNNLabel)[1]
+xx = cpt_x / 100 * 24000
+yy = cpt_y * predicted
+#plot(xx,yy)
+xx = prepend(xx,0,before=1)
+yy = prepend(yy,0,before=1)
+fit = lm(yy~poly(xx,3,raw=TRUE))
+xx = 0:24000
+model_yy = predict(fit,data.frame(xx))
+
+png("KNN_lift_chart_train.png")
+plot(xx, model_yy, col="green",xlab="Number of total data", ylab="Cumulative number of target data")
+best_yy = rep(predicted,24001)
+for(i in 0:predicted){
+  best_yy[i+1] = i
+}
+lines(xx,best_yy,col="red",lwd=3)
+base_yy = predicted / 24000 * xx
+lines(xx,base_yy,col="blue")
+legend(17500,750, legend=c("best curve","model", "baseline"), col = c("red","green","blue"), lwd=c(1,1,1),cex=1)
+title("Lift chart of KNN (training)")
+dev.off()
+library(geiger)
+#area1 = geiger:::.area.between.curves(xx,base_yy,yy)
+#area2 = geiger:::.area.between.curves(xx,best_yy,yy)
+#area1 / area2
+a1 = sum(model_yy-base_yy)
+a2 = sum(best_yy-base_yy)
+a1/a2
+```
+gains for validation
+```{r}
+# validation
+PredKNNLabelV = data.frame(knnv)
+names(PredKNNLabelV) <- "PredKNNLabelV"
+PredKNNScoreV = attr(knnv, "prob") # its the propotion of the wining class
+# convert it into the probablity of default
+for (i in 1:length(PredKNNScoreV)){
+  if (knnv[i] == "NOT"){
+    PredKNNScoreV[i] = 1 - PredKNNScoreV[i]
+  }
+}
+PredKNNScoreV = data.frame(PredKNNScoreV)
+names(PredKNNScoreV) <- "PredKNNScoreV"
+valid_norm = data.frame(valid_norm,PredKNNLabelV, PredKNNScoreV)
+```
+
+```{r}
+library(gains)
+library(rlang)
+gtv = gains(actual=valid_norm$Payment, predicted=valid_norm$PredKNNScoreV,optimal=TRUE)
+cpv_y = gtv$cume.pct.of.total
+#cpt_y = prepend(cpt_y,0,before=1)
+cpv_x = gtv$depth
+#cpt_x = prepend(cpt_x,0,before=1)
+#fit = lm(cpt_y~poly(cpt_x,3,raw=TRUE))
+predictedValid = table(valid_norm$PredKNNLabelV)[1]
+xxv = cpv_x / 100 * 6000
+yyv = cpv_y * predictedValid
+#plot(xx,yy)
+xxv = prepend(xxv,0,before=1)
+yyv = prepend(yyv,0,before=1)
+fit = lm(yyv~poly(xxv,3,raw=TRUE))
+xxv = 0:6000
+model_yyv = predict(fit,data.frame(xxv))
+
+png("KNN_lift_chart_validation.png")
+plot(xxv, model_yyv, col="green",xlab="Number of total data", ylab="Cumulative number of target data")
+best_yyv = rep(predictedValid,6001)
+for(i in 0:predictedValid){
+  best_yyv[i+1] = i
+}
+lines(xxv,best_yyv,col="red",lwd=3)
+base_yyv = predictedValid / 6000 * xxv
+lines(xxv,base_yyv,col="blue")
+legend(17500,750, legend=c("best curve","model", "baseline"), col = c("red","green","blue"), lwd=c(1,1,1),cex=1)
+title("Lift chart of KNN (validation)")
+dev.off()
+library(geiger)
+#area1 = geiger:::.area.between.curves(xx,base_yy,yy)
+#area2 = geiger:::.area.between.curves(xx,best_yy,yy)
+#area1 / area2
+a1 = sum(model_yyv-base_yyv)
+a2 = sum(best_yyv-base_yyv)
+a1/a2
+```
+
+Use the SSM(Sorting Smoothing Method) to estimate the real probability
+```{r}
+#1. order the valid data according to predictive probability
+valid_norm_sort = valid_norm[order(PredKNNScoreV),]
+#2. use SSM formula to evaluate actural probability 'Pi', we choose n =50 according to the paper
+VALIDSIZE = dim(valid_norm)[1]
+n = 50
+actural_p_valid = rep(0,VALIDSIZE)
+#pred_valid = valid_sort$PredTreeScoreValid
+pred_valid = round(valid_norm_sort$PredKNNScoreV)
+pred_valid = prepend(pred_valid,rep(0,n),before=1)
+pred_valid = append(pred_valid,rep(0,n))
+for(i in 1:VALIDSIZE){
+  actural_p_valid[i] = sum(pred_valid[i:(i+2*n)])/(2*n+1)
+}
+valid_norm_sort = data.frame(valid_norm_sort,actural_p_valid)
+png("Scatter plot diagram of KNN.png")
+plot(valid_norm_sort$PredKNNScoreV,valid_norm_sort$actural_p_valid,xlab="Predicted Probability",ylab="Actual probability")
+yy = valid_norm_sort$actural_p_valid
+xx = valid_norm_sort$PredKNNScore
+actual_fit = lm(yy~xx)
+xx = seq(0,1:0.1)
+yy = predict(actual_fit,data.frame((xx)))
+lines(xx,yy)
+summary(actual_fit)
+legend(0.03,0.9,legend=c("y = 1.385x - 0.18","R^2 = 0.7089"))
+dev.off()
+```
