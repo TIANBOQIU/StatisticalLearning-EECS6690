@@ -49,22 +49,167 @@ for(name in names(train)){
 ```
 
 ```{r}
-library(neuralnet)
+
 # set up ANN formula
 names = names(train)
 f <- as.formula(paste("Payment ~", paste(names[!names %in% c("Payment","ID", "indicator","High")], collapse = " + ")))
 
 ```
 
+try to use nnet
 ```{r}
-net <- neuralnet(f, data=train_norm, hidden = c(3,2),act.fct = "logistic",linear.output = FALSE,lifesign = "full",threshold = 0.05)
-
-#net <- neuralnet(f, data=train_norm, hidden = 20,act.fct = "logistic",linear.output = FALSE,lifesign = "full",threshold = 0.05)
-
+library(nnet)
+set.seed(12345)
+targets <- class.ind(train_norm$High)
+#net <- nnet(f, data = train_norm, size = 5, rang=0.2, decay=5e-4, maxit = 200)
+net <- nnet(f, data = train_norm, size = 6, rang=0.2, decay=5e-4, maxit = 250,skip=1)
+```
+```{r}
+pred = predict(net, train_norm)
+tt = table(pred = round(pred), actual = train_norm$Payment)
+error_train = 1 - sum(diag(tt)) / sum(tt)
+predV = predict(net, valid_norm)
+tv = table(pred = round(predV), actual = valid_norm$Payment)
+error_valid = 1 - sum(diag(tv)) / sum(tv)
+error_train
+error_valid
 ```
 
 
+gains
 ```{r}
+library(gains)
+library(rlang)
+predLable = data.frame(round(pred))
+names(predLable) <- "predLable"
+train_norm = data.frame(train_norm, pred, predLable)
+```
+```{r}
+gtt = gains(actual=train_norm$Payment,predicted=train_norm$pred,optimal=TRUE)
+cpt_y = gtt$cume.pct.of.total
+#cpt_y = prepend(cpt_y,0,before=1)
+cpt_x = gtt$depth
+#cpt_x = prepend(cpt_x,0,before=1)
+#fit = lm(cpt_y~poly(cpt_x,3,raw=TRUE))
+predicted = table(train_norm$predLable)[2]
+xx = cpt_x / 100 * 24000
+yy = cpt_y * predicted
+#plot(xx,yy)
+xx = prepend(xx,0,before=1)
+yy = prepend(yy,0,before=1)
+fit = lm(yy~poly(xx,3,raw=TRUE))
+xx = 0:24000
+model_yy = predict(fit,data.frame(xx))
+
+png("ANN_lift_chart_train.png")
+plot(xx, model_yy, col="green",xlab="Number of total data", ylab="Cumulative number of target data")
+best_yy = rep(predicted,24001)
+for(i in 0:predicted){
+  best_yy[i+1] = i
+}
+lines(xx,best_yy,col="red",lwd=3)
+base_yy = predicted / 24000 * xx
+lines(xx,base_yy,col="blue")
+legend(17500,750, legend=c("best curve","model", "baseline"), col = c("red","green","blue"), lwd=c(1,1,1),cex=1)
+title("Lift chart of ANN (training)")
+dev.off()
+library(geiger)
+#area1 = geiger:::.area.between.curves(xx,base_yy,yy)
+#area2 = geiger:::.area.between.curves(xx,best_yy,yy)
+#area1 / area2
+a1 = sum(model_yy-base_yy)
+a2 = sum(best_yy-base_yy)
+a1/a2
+```
+
+validation gains chart:
+```{r}
+library(rlang)
+predLabelV = data.frame(round(predV))
+names(predLabelV) <- "predLabelV"
+predV = data.frame(predV)
+valid_norm = data.frame(valid_norm,predV, predLabelV)
+```
+
+```{r}
+gtv = gains(actual=valid_norm$Payment,predicted=valid_norm$predV,optimal=TRUE)
+cpv_y = gtv$cume.pct.of.total
+cpv_x = gtv$depth
+predictedValid = table(valid_norm$predLabelV)[2]
+
+xxv = cpv_x / 100 * 6000
+yyv = cpv_y * predictedValid
+#plot(xxv,yyv)
+xxv = prepend(xxv,0,before=1)
+yyv = prepend(yyv,0,before=1)
+fitv = lm(yyv~poly(xxv,3,raw=TRUE))
+xxv = 0:6000
+model_yyv = predict(fitv,data.frame(xxv))
+png("ANN_lift_chart_valid.png")
+plot(xxv, model_yyv, col="green",xlab="Number of total data", ylab="Cumulative number of target data")
+best_yyv = rep(predictedValid,6001)
+for(i in 0:predictedValid){
+  best_yyv[i+1] = i
+}
+lines(xxv,best_yyv,col="red",lwd=3)
+base_yyv = predictedValid / 6000 * xxv
+lines(xxv,base_yyv,col="blue")
+legend(17500,750, legend=c("best curve","model", "baseline"), col = c("red","green","blue"), lwd=c(1,1,1),cex=1)
+title("Lift chart of ANN (validation)")
+dev.off()
+library(geiger)
+#area1 = geiger:::.area.between.curves(xx,base_yy,yy)
+#area2 = geiger:::.area.between.curves(xx,best_yy,yy)
+#area1 / area2
+a1v = sum(model_yyv-base_yyv)
+a2v = sum(best_yyv-base_yyv)
+a1v/a2v
+```
+
+
+Use the SSM(Sorting Smoothing Method) to estimate the real probability
+```{r}
+#1. order the valid data according to predictive probability
+valid_norm_sort = valid_norm[order(predV),]
+#2. use SSM formula to evaluate actural probability 'Pi', we choose n =50 according to the paper
+VALIDSIZE = dim(valid_norm)[1]
+n = 50
+actural_p_valid = rep(0,VALIDSIZE)
+#pred_valid = valid_sort$PredTreeScoreValid
+pred_valid = valid_norm_sort$predLabelV
+pred_valid = prepend(pred_valid,rep(0,n),before=1)
+pred_valid = append(pred_valid,rep(0,n))
+for(i in 1:VALIDSIZE){
+  actural_p_valid[i] = sum(pred_valid[i:(i+2*n)])/(2*n+1)
+}
+valid_norm_sort = data.frame(valid_norm_sort,actural_p_valid)
+png("Scatter plot diagram of ANNs.png")
+plot(valid_norm_sort$predV,valid_norm_sort$actural_p_valid,xlab="Predicted Probability",ylab="Actual probability")
+yy = valid_norm_sort$actural_p_valid
+xx = valid_norm_sort$predV
+actual_fit = lm(yy~xx)
+xx = seq(0,1:0.1)
+yy = predict(actual_fit,data.frame((xx)))
+lines(xx,yy)
+legend(0.03,0.9,legend=c("y = 1.311x - 0.14","R^2 = 0.7895"))
+dev.off()
+```
+
+
+logs
+
+library(neuralnet)
+set.seed(100)
+net <- neuralnet(f, data=train_norm, hidden = 4,act.fct = "logistic",linear.output = FALSE,lifesign = "full",threshold = 0.01,stepmax = 2e+05)
+
+#net <- neuralnet(f, data=train_norm, hidden = 20,act.fct = "logistic",linear.output = FALSE,lifesign = "full",threshold = 0.05)
+# hidden c(10,3) train:0.170 v:0.461
+# hidden = 4m threshold = 0.1 -0.176 0.20 thresh=0.03 0.177 0.208 w_4_0.03
+# -thresh 0.01 20min 0.176 0.216
+
+
+
+
 xx = train_norm
 xx["ID"] <- NULL
 xx["Payment"] <- NULL
@@ -78,8 +223,7 @@ tt = table(rounded_result)
 error_train = 1 - sum(diag(tt)) / sum(tt)
 error_train
 
-```
-```{r}
+
 xxv = valid_norm
 xxv["ID"] <- NULL
 xxv["Payment"] <- NULL
@@ -92,9 +236,7 @@ rounded_resultv = data.frame(rounded_resultv)
 ttv = table(rounded_resultv)
 error_valid = 1 - sum(diag(ttv)) / sum(ttv)
 error_valid
-```
 
-```{r}
 # training error
 predL = predict(net,train_norm,type="class")
 tt = table(train$High, predL)
@@ -106,6 +248,6 @@ predLV = predict(net,valid_norm,type="class")
 tv = table(valid$High,predLV)
 error_valid = 1 - sum(diag(tv)) /  sum(tv)
 error_valid
-```
+
 
 
