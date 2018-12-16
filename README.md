@@ -11,7 +11,7 @@ Classification accuracy
 |Naive Bayesian  	       |0.201       	|0.213      	|0.424      	|0.385       |
 |Neural networks         |0.175         |0.188      	|0.498        |0.440       |
 |Classification Trees    |0.179    	    |0.185       	|0.494       	|0.456       |
-
+|Random Forest*          |0.181         |0.186        |0.468        |0.458       |
 # Plots
 
 [ANNT]:/CreditDefault/ANN_lift_chart_train.png "lift chart of artificial neural network (training)"
@@ -38,6 +38,10 @@ Classification accuracy
 [NBV]:/CreditDefault/Naive_Bayes_lift_chart_validation.png "lift chart of Naive Bayes Classifier (validation)"
 [NBS]:/CreditDefault/Scatter%20plot%20diagram%20of%20Naive%20Bayes.png  "Scatter plot diagram of Naive Bayes Classifier"
 
+[RFT]:/CreditDefault/Random_Forest_lift_chart_train.png "lift chart of Random Forest (training)"
+[RFV]:/CreditDefault/Random_Forest_lift_chart_validation.png "lift chart of Random Forest (validation)"
+[RFS]:/CreditDefault/Scatter%20plot%20diagram%20of%20Random%20Forest.png  "Scatter plot diagram of Random Forest"
+
 ![alt text][ANNT]
 ![alt text][ANNV]
 ![alt text][CTT]
@@ -50,6 +54,8 @@ Classification accuracy
 ![alt text][DAV]
 ![alt text][NBT]
 ![alt text][NBV]
+![alt text][RFT]
+![alt text][RFV]
 
 ![alt text][ANNS]
 ![alt text][CTS]
@@ -57,3 +63,4 @@ Classification accuracy
 ![alt text][LRS]
 ![alt text][DAS]
 ![alt text][NBS]
+![alt text][RFS]
