@@ -204,35 +204,7 @@ xx = seq(0,1:0.1)
 yy = predict(actual_fit,data.frame((xx)))
 lines(xx,yy)
 summary(actual_fit)
-legend(0.03,0.9,legend=c("y = 1.427x + 0.73","R^2 = 0.6441"))
+legend(0.03,0.9,legend=c("y = 0.986x - 0.006","R^2 = 0.9196"))
 dev.off()
 ```
 
-Use the SSM(Sorting Smoothing Method) to estimate the real probability
-```{r}
-#1. order the valid data according to predictive probability
-valid_norm_sort = valid_norm[order(PredScoreV),]
-#2. use SSM formula to evaluate actural probability 'Pi', we choose n =50 according to the paper
-VALIDSIZE = dim(valid_norm)[1]
-n = 50
-actural_p_valid = rep(0,VALIDSIZE)
-#pred_valid = valid_sort$PredTreeScoreValid
-pred_valid = valid_norm_sort$PredLabelV
-pred_valid = prepend(pred_valid,rep(0,n),before=1)
-pred_valid = append(pred_valid,rep(0,n))
-for(i in 1:VALIDSIZE){
-  actural_p_valid[i] = sum(pred_valid[i:(i+2*n)])/(2*n+1)
-}
-valid_norm_sort = data.frame(valid_norm_sort,actural_p_valid)
-png("Scatter plot diagram of Logistic Regression.png")
-plot(valid_norm_sort$PredScoreV,valid_norm_sort$actural_p_valid,xlab="Predicted Probability",ylab="Actual probability")
-yy = valid_norm_sort$actural_p_valid
-xx = valid_norm_sort$PredScore
-actual_fit = lm(yy~xx)
-xx = seq(0,1:0.1)
-yy = predict(actual_fit,data.frame((xx)))
-lines(xx,yy)
-summary(actual_fit)
-legend(0.03,0.9,legend=c("y = 1.375x - 0.23","R^2 = 0.6104"))
-dev.off()
-```
