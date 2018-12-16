@@ -6,7 +6,7 @@ Classification accuracy
 |------------------------|--------------|-------------|-------------|------------|
 |  	                     |Training  	  |Validation  	|Training  	  |Validation  |
 |K-nearest neighbor  	   |0.189         |0.193        |0.466       	|0.417       |
-|Logistic regression     |            	|           	|           	|            |
+|Logistic regression     |0.189       	|0.189      	|0.369      	|0.367       |
 |Discriminant analysis   |            	|            	|            	|            |
 |Naive Bayesian  	       |            	|           	|           	|            |
 |Neural networks         |0.175         |0.188      	|0.498        |0.440       |
