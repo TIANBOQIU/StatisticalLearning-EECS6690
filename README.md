@@ -13,6 +13,7 @@ Classification accuracy
 |Classification Trees    |0.179    	    |0.185       	|0.494       	|0.456       |
 
 # Plots
+
 [ANNT] = \CreditDefault\ANN_lift_chart_train.png "lift chart of artificial neural network (training)"
 [ANNV] = \CreditDefault\ANN_lift_chart_valid.png "lift chart of artificial neural network (validation)"
 [ANNS] = \CreditDefault\Scatter plot diagram of ANNs.png  "lift chart of artificial neural network (training)"
