@@ -14,9 +14,9 @@ Classification accuracy
 
 # Plots
 
-[ANNT] = \CreditDefault\ANN_lift_chart_train.png "lift chart of artificial neural network (training)"
-[ANNV] = \CreditDefault\ANN_lift_chart_valid.png "lift chart of artificial neural network (validation)"
-[ANNS] = \CreditDefault\Scatter plot diagram of ANNs.png  "lift chart of artificial neural network (training)"
+[ANNT] : \CreditDefault\ANN_lift_chart_train.png "lift chart of artificial neural network (training)"
+[ANNV] : \CreditDefault\ANN_lift_chart_valid.png "lift chart of artificial neural network (validation)"
+[ANNS] : \CreditDefault\Scatter plot diagram of ANNs.png  "lift chart of artificial neural network (training)"
 
 
 
