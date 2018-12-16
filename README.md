@@ -8,7 +8,7 @@ Classification accuracy
 |K-nearest neighbor  	   |0.189         |0.193        |0.466       	|0.417       |
 |Logistic regression     |0.189       	|0.189      	|0.369      	|0.367       |
 |Discriminant analysis   |0.187       	|0.187       	|0.365       	|0.375       |
-|Naive Bayesian  	       |            	|           	|           	|            |
+|Naive Bayesian  	       |0.201       	|0.213      	|0.424      	|0.385       |
 |Neural networks         |0.175         |0.188      	|0.498        |0.440       |
 |Classification Trees    |0.179    	    |0.185       	|0.494       	|0.456       |
 
@@ -34,6 +34,9 @@ Classification accuracy
 [DAV]:/CreditDefault/Discriminant_Analysis_lift_chart_validation.png "lift chart of Discriminant Analysis (validation)"
 [DAS]:/CreditDefault/Scatter%20plot%20diagram%20of%20Discriminant%20Analysis.png  "Scatter plot diagram of Discriminant Analysis"
 
+[NBT]:/CreditDefault/Naive_Bayes_lift_chart_train.png "lift chart of Naive Bayes Classifier (training)"
+[NBV]:/CreditDefault/Naive_Bayes_lift_chart_validation.png "lift chart of Naive Bayes Classifier (validation)"
+[NBS]:/CreditDefault/Scatter%20plot%20diagram%20of%20Naive%20Bayes.png  "Scatter plot diagram of Naive Bayes Classifier"
 
 ![alt text][ANNT]
 ![alt text][ANNV]
@@ -45,10 +48,12 @@ Classification accuracy
 ![alt text][LRV]
 ![alt text][DAT]
 ![alt text][DAV]
-
+![alt text][NBT]
+![alt text][NBV]
 
 ![alt text][ANNS]
 ![alt text][CTS]
 ![alt text][KNNS]
 ![alt text][LRS]
 ![alt text][DAS]
+![alt text][NBS]

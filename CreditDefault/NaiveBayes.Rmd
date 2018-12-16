@@ -1,0 +1,238 @@
+---
+title: "NaiveBayes"
+author: "Tianbo Qiu"
+date: "December 16, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+read the data
+```{r}
+data = read.csv("CreditDataRaw.csv",encoding="UTF-8")
+names(data)[1] <- "ID"
+names(data)[25] <- "Payment" #default.payment.next.month
+High = ifelse(data$Payment==0,"NOT","DEFAULT")
+data = data.frame(data,High)
+set.seed(10)
+DATASIZE = dim(data)[1]
+train_index = sample(DATASIZE, DATASIZE*0.8)
+indicator = rep(0,DATASIZE)
+indicator[train_index] = 1 # 1:train 0:valid
+data = data.frame(data,indicator)
+train = subset(data,data$indicator==1)
+valid = subset(data,data$indicator==0)
+```
+
+```{r}
+# modified for the requirement of naive_bayes() 
+names = names(train)
+f <- as.formula(paste("High ~", paste(names[!names %in% c("Payment","ID", "indicator","Payment","High")], collapse = " + ")))
+```
+
+
+
+# norm the data
+```{r}
+# Scale the Feature into the [0,1] interval
+scale01 <- function(x){
+  (x - min(x)) / (max(x) - min(x))
+}
+train_norm = train
+valid_norm = valid
+for(name in names(train)){
+  if(name != "cl" && name != "ID" && name !="Payment" && name != "High"  && name != "indicator"){
+    train_norm[name] <- scale01(train_norm[name])
+    valid_norm[name] <- scale01(valid_norm[name])
+  }
+  
+}
+
+```
+
+
+
+
+Naive Bayes Classifier
+```{r}
+library(naivebayes)
+train_norm = train
+valid_norm = valid
+fit2 = naive_bayes(f, data=train_norm, usekernel = TRUE)
+
+```
+
+```{r}
+predLable = predict(fit2, train_norm, type = "class")
+predScore = predict(fit2, train_norm, type = "prob")
+predLable = data.frame(predLable)
+predScore = data.frame(predScore)
+train_norm = data.frame(train_norm,predLable,predScore)
+
+predLableV = predict(fit2, valid_norm, type = "class")
+predScoreV = predict(fit2, valid_norm, type = "prob")
+predLableV = data.frame(predLableV)
+predScoreV = data.frame(predScoreV)
+valid_norm = data.frame(valid_norm,predLableV,predScoreV)
+
+tt = table(pred = train_norm$predLable, actural = train_norm$High)
+tv = table(pred = valid_norm$predLableV, actural = valid_norm$High)
+
+error_train = 1 - sum(diag(tt)) / sum(tt)
+error_valid = 1 - sum(diag(tv)) / sum(tv)
+error_train
+error_valid
+```
+
+
+
+
+
+```{r}
+library(gains)
+library(rlang)
+gtt = gains(actual=train_norm$Payment, predicted=train_norm$DEFAULT,optimal=TRUE)
+cpt_y = gtt$cume.pct.of.total
+#cpt_y = prepend(cpt_y,0,before=1)
+cpt_x = gtt$depth
+#cpt_x = prepend(cpt_x,0,before=1)
+#fit = lm(cpt_y~poly(cpt_x,3,raw=TRUE))
+
+
+predicted = table(train_norm$predLable)[1]
+xx = cpt_x / 100 * 24000
+yy = cpt_y * predicted
+#plot(xx,yy)
+xx = prepend(xx,0,before=1)
+yy = prepend(yy,0,before=1)
+fit = lm(yy~poly(xx,3,raw=TRUE))
+xx = 0:24000
+model_yy = predict(fit,data.frame(xx))
+
+png("Naive_Bayes_lift_chart_train.png")
+plot(xx, model_yy, col="green",xlab="Number of total data", ylab="Cumulative number of target data")
+best_yy = rep(predicted,24001)
+for(i in 0:predicted){
+  best_yy[i+1] = i
+}
+lines(xx,best_yy,col="red",lwd=3)
+base_yy = predicted / 24000 * xx
+lines(xx,base_yy,col="blue")
+legend(17500,750, legend=c("best curve","model", "baseline"), col = c("red","green","blue"), lwd=c(1,1,1),cex=1)
+title("Lift chart of Naive Bayes Classifier (training)")
+dev.off()
+library(geiger)
+#area1 = geiger:::.area.between.curves(xx,base_yy,yy)
+#area2 = geiger:::.area.between.curves(xx,best_yy,yy)
+#area1 / area2
+a1 = sum(model_yy-base_yy)
+a2 = sum(best_yy-base_yy)
+a1/a2
+```
+gains for validation
+
+```{r}
+library(gains)
+library(rlang)
+gtv = gains(actual=valid_norm$Payment, predicted=valid_norm$DEFAULT,optimal=TRUE)
+cpv_y = gtv$cume.pct.of.total
+#cpt_y = prepend(cpt_y,0,before=1)
+cpv_x = gtv$depth
+#cpt_x = prepend(cpt_x,0,before=1)
+#fit = lm(cpt_y~poly(cpt_x,3,raw=TRUE))
+predictedValid = table(valid_norm$predLableV)[1]
+xxv = cpv_x / 100 * 6000
+yyv = cpv_y * predictedValid
+#plot(xx,yy)
+xxv = prepend(xxv,0,before=1)
+yyv = prepend(yyv,0,before=1)
+fit = lm(yyv~poly(xxv,3,raw=TRUE))
+xxv = 0:6000
+model_yyv = predict(fit,data.frame(xxv))
+
+png("Naive_Bayes_lift_chart_validation.png")
+plot(xxv, model_yyv, col="green",xlab="Number of total data", ylab="Cumulative number of target data")
+best_yyv = rep(predictedValid,6001)
+for(i in 0:predictedValid){
+  best_yyv[i+1] = i
+}
+lines(xxv,best_yyv,col="red",lwd=3)
+base_yyv = predictedValid / 6000 * xxv
+lines(xxv,base_yyv,col="blue")
+legend(17500,750, legend=c("best curve","model", "baseline"), col = c("red","green","blue"), lwd=c(1,1,1),cex=1)
+title("Lift chart of Naive Bayes Classifier (validation)")
+dev.off()
+library(geiger)
+#area1 = geiger:::.area.between.curves(xx,base_yy,yy)
+#area2 = geiger:::.area.between.curves(xx,best_yy,yy)
+#area1 / area2
+a1 = sum(model_yyv-base_yyv)
+a2 = sum(best_yyv-base_yyv)
+a1/a2
+```
+
+
+Use the SSM(Sorting Smoothing Method) to estimate the real probability
+```{r}
+#1. order the valid data according to predictive probability
+PredLabelV2 = ifelse(valid_norm$predLableV=="NOT",0,1)
+valid_norm = data.frame(valid_norm,PredLabelV2)
+
+
+valid_norm_sort = valid_norm[order(valid_norm$DEFAULT),]
+
+#2. use SSM formula to evaluate actural probability 'Pi', we choose n =50 according to the paper
+VALIDSIZE = dim(valid_norm)[1]
+n = 50
+actural_p_valid = rep(0,VALIDSIZE)
+#pred_valid = valid_sort$PredTreeScoreValid
+pred_valid = valid_norm_sort$PredLabelV2
+pred_valid = prepend(pred_valid,rep(0,n),before=1)
+pred_valid = append(pred_valid,rep(0,n))
+for(i in 1:VALIDSIZE){
+  actural_p_valid[i] = sum(pred_valid[i:(i+2*n)])/(2*n+1)
+}
+valid_norm_sort = data.frame(valid_norm_sort,actural_p_valid)
+png("Scatter plot diagram of Naive Bayes.png")
+plot(valid_norm_sort$DEFAULT,valid_norm_sort$actural_p_valid,xlab="Predicted Probability",ylab="Actual probability")
+yy = valid_norm_sort$actural_p_valid
+xx = valid_norm_sort$DEFAULT
+actual_fit = lm(yy~xx)
+xx = seq(0,1:0.1)
+yy = predict(actual_fit,data.frame((xx)))
+lines(xx,yy)
+summary(actual_fit)
+legend(0.03,0.9,legend=c("y = 1.427x + 0.73","R^2 = 0.6441"))
+dev.off()
+```
+
+Use the SSM(Sorting Smoothing Method) to estimate the real probability
+```{r}
+#1. order the valid data according to predictive probability
+valid_norm_sort = valid_norm[order(PredScoreV),]
+#2. use SSM formula to evaluate actural probability 'Pi', we choose n =50 according to the paper
+VALIDSIZE = dim(valid_norm)[1]
+n = 50
+actural_p_valid = rep(0,VALIDSIZE)
+#pred_valid = valid_sort$PredTreeScoreValid
+pred_valid = valid_norm_sort$PredLabelV
+pred_valid = prepend(pred_valid,rep(0,n),before=1)
+pred_valid = append(pred_valid,rep(0,n))
+for(i in 1:VALIDSIZE){
+  actural_p_valid[i] = sum(pred_valid[i:(i+2*n)])/(2*n+1)
+}
+valid_norm_sort = data.frame(valid_norm_sort,actural_p_valid)
+png("Scatter plot diagram of Logistic Regression.png")
+plot(valid_norm_sort$PredScoreV,valid_norm_sort$actural_p_valid,xlab="Predicted Probability",ylab="Actual probability")
+yy = valid_norm_sort$actural_p_valid
+xx = valid_norm_sort$PredScore
+actual_fit = lm(yy~xx)
+xx = seq(0,1:0.1)
+yy = predict(actual_fit,data.frame((xx)))
+lines(xx,yy)
+summary(actual_fit)
+legend(0.03,0.9,legend=c("y = 1.375x - 0.23","R^2 = 0.6104"))
+dev.off()
+```
